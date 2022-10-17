@@ -3,16 +3,43 @@ import { Buffer } from 'node:buffer';
 import util from 'util';
 
 import dns from 'dns';
-import { lookup } from 'node:dns/promises';
+import { resolve4 } from 'node:dns/promises';
 
 const host = 'www.example.com';
-const ip = await lookup(host);
+// note: resolve4 will not work with IP addresses nor will it work with values like 'localhost'
+const ipAddresses = await resolve4(host, { ttl: true });
 
+const { address, ttl } = ipAddresses.pop();
+
+let cacheIpAddr = address;
+let cacheTtl = ttl * 1000; // store ttl in ms
+let cacheTimestamp = Date.now();
 const socket = dgram.createSocket({
   type: 'udp4',
   lookup: (hostname, options, callback) => {
     if (hostname === host) {
-      callback(null, ip.address, ip.family);
+      const now = Date.now();
+      if (
+        (now - cacheTimestamp > cacheTtl)
+      ) {
+        dns.resolve4(hostname, { ttl: true }, (err, addresses) => {
+          if (err) {
+            console.error(err);
+            return;
+          }
+
+          cacheIpAddr = addresses[0].address;
+          cacheTtl = addresses[0].ttl * 1000;
+
+          console.log('cache updated', { cacheIpAddr, cacheTtl });
+
+          callback(null, address, 4);
+        });
+      } else {
+        console.log('using cached address');
+        callback(null, address, 4);
+      }
+
       return;
     }
 
@@ -30,5 +57,11 @@ await socket.send2(msg, 0, msg.length, 8125, host);
 console.log('msg 2 sent');
 await socket.send2(msg, 0, msg.length, 8125, 'example.net');
 console.log('msg 3 sent');
+
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+// note: www.example.com has a _very_ long ttl
+await delay(cacheTtl);
+await socket.send2(msg, 0, msg.length, 8125, host);
+console.log('msg 4 sent');
 
 socket.close();
