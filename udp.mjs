@@ -2,6 +2,14 @@ import dgram from 'node:dgram';
 import { Buffer } from 'node:buffer';
 import util from 'util';
 
+import dns from 'node:dns';
+
+const originalLookup = dns.lookup;
+dns.lookup = (...args) => {
+  console.log('called dns.lookup');
+  originalLookup(...args);
+};
+
 const host = 'www.example.com';
 
 const socket = dgram.createSocket('udp4');
