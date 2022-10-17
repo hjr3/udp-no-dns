@@ -9,8 +9,8 @@ const ip = await lookup(host);
 
 const socket = dgram.createSocket({
   type: 'udp4',
-  lookup: (_hostname, _options, callback) => {
-    console.log('called dns.lookup');
+  lookup: (hostname, options, callback) => {
+    console.log('called lookup', { hostname, options });
     callback(null, ip.address, ip.family);
   },
 });
