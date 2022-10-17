@@ -5,16 +5,16 @@ import util from 'util';
 import dns from 'node:dns';
 import { lookup } from 'node:dns/promises';
 
-const originalLookup = dns.lookup;
-dns.lookup = (...args) => {
-  console.log('called dns.lookup');
-  originalLookup(...args);
-};
-
 const host = 'www.example.com';
 const ip = await lookup(host);
 
-const socket = dgram.createSocket('udp4');
+const socket = dgram.createSocket({
+  type: 'udp4',
+  lookup: (hostname, options, callback) => {
+    console.log('called dns.lookup');
+    dns.lookup(hostname, options, callback);
+  },
+});
 socket.send2 = util.promisify(socket.send);
 
 const msg = Buffer.from('foo');
