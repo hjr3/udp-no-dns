@@ -14,15 +14,20 @@ const { address, ttl } = ipAddresses.pop();
 let cacheIpAddr = address;
 let cacheTtl = ttl * 1000; // store ttl in ms
 let cacheTimestamp = Date.now();
+let resolveLock = false;
 const socket = dgram.createSocket({
   type: 'udp4',
   lookup: (hostname, options, callback) => {
     if (hostname === host) {
       const now = Date.now();
       if (
+        resolveLock === false &&
         (now - cacheTimestamp > cacheTtl)
       ) {
+        resolveLock = true;
+        console.log('lazily refreshing ip address...');
         dns.resolve4(hostname, { ttl: true }, (err, addresses) => {
+          resolveLock = false;
           if (err) {
             console.error(err);
             return;
@@ -33,13 +38,11 @@ const socket = dgram.createSocket({
 
           console.log('cache updated', { cacheIpAddr, cacheTtl });
 
-          callback(null, address, 4);
+          // intentionally do not call the callback
         });
-      } else {
-        console.log('using cached address');
-        callback(null, address, 4);
       }
 
+      callback(null, address, 4);
       return;
     }
 
